@@ -1,0 +1,168 @@
+{% extends "layout.html" %}
+
+{% block title %}Motoboys{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Formulário de Novo Motoboy -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0">Novo Entregador</h5>
+            </div>
+            <div class="card-body">
+                <form action="/motoboys" method="POST">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome / Apelido *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" placeholder="Ex: Carlos (Moto Azul)" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="telefone" class="form-label">WhatsApp / Telefone</label>
+                        <input type="text" class="form-control" id="telefone" name="telefone" placeholder="(51) 99999-9999">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="chave_pix" class="form-label">Chave Pix (para pagamento)</label>
+                        <input type="text" class="form-control" id="chave_pix" name="chave_pix" placeholder="CPF, Celular ou E-mail">
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark fw-semibold">Cadastrar Motoboy</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Motoboys Cadastrados -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <h5 class="fw-bold mb-0">Entregadores da Loja</h5>
+                <span class="badge bg-secondary">{{ motoboys|length }} cadastrado(s)</span>
+            </div>
+            <div class="card-body p-0">
+                {% if not motoboys %}
+                    <div class="p-4 text-center text-muted">
+                        Nenhum motoboy cadastrado ainda. Use o formulário ao lado para adicionar o primeiro.
+                    </div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Nome</th>
+                                    <th>Telefone</th>
+                                    <th>Chave Pix</th>
+                                    <th>Link do App</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for mb in motoboys %}
+                                <tr class="{% if not mb.ativo %}table-secondary text-muted{% endif %}">
+                                    <td class="ps-3 fw-semibold">{{ mb.nome }}</td>
+                                    <td>{{ mb.telefone or "-" }}</td>
+                                    <td>{{ mb.chave_pix or "-" }}</td>                                    
+                                    <td>
+                                        {% if mb.ativo %}
+                                            {% set link_app = request.host_url ~ 'extrato/' ~ mb.token_acesso %}
+                                            <button type="button" class="btn btn-sm btn-outline-dark" onclick="copiarLink('{{ link_app }}', this)">
+                                                Copiar Link
+                                            </button>
+                                            {% if mb.telefone %}
+                                                {% set tel_limpo = mb.telefone|replace('(', '')|replace(')', '')|replace('-', '')|replace(' ', '')|replace('+', '') %}
+                                                {% set tel_whats = tel_limpo if tel_limpo.startswith('55') else '55' ~ tel_limpo %}
+                                                <a href="https://wa.me/{{ tel_whats }}?text={{ ('Olá ' ~ mb.nome ~ ', acesse seu extrato de entregas pelo link e salve na tela inicial do celular: ' ~ link_app)|urlencode }}" target="_blank" class="btn btn-sm btn-success">
+                                                    WhatsApp
+                                                </a>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted small">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if mb.ativo %}
+                                            <span class="badge bg-success">Ativo</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#modalEditar{{ mb.id }}">
+                                            Editar
+                                        </button>
+
+                                        <form action="/motoboys/{{ mb.id }}/toggle" method="POST" class="d-inline">
+                                            {% if mb.ativo %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Desativar</button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-sm btn-outline-success">Ativar</button>
+                                            {% endif %}
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal de Edição -->
+                                <div class="modal fade" id="modalEditar{{ mb.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form action="/motoboys/{{ mb.id }}/editar" method="POST">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title fw-bold">Editar Motoboy</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Nome *</label>
+                                                        <input type="text" name="nome" class="form-control" value="{{ mb.nome }}" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Telefone</label>
+                                                        <input type="text" name="telefone" class="form-control" value="{{ mb.telefone or '' }}">
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Chave Pix</label>
+                                                        <input type="text" name="chave_pix" class="form-control" value="{{ mb.chave_pix or '' }}">
+                                                    </div>
+                                                    <hr>
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <small class="text-muted">Perdeu o celular ou vazou o link?</small>
+                                                        <button type="submit" formaction="/motoboys/{{ mb.id }}/novo-link" class="btn btn-sm btn-outline-warning">
+                                                            Gerar Novo Link
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-dark">Salvar Alterações</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function copiarLink(url, btn) {
+    navigator.clipboard.writeText(url).then(() => {
+        const original = btn.innerText;
+        btn.innerText = "Copiado!";
+        btn.classList.replace("btn-outline-dark", "btn-success");
+        setTimeout(() => {
+            btn.innerText = original;
+            btn.classList.replace("btn-success", "btn-outline-dark");
+        }, 2000);
+    });
+}
+</script>
+{% endblock %}

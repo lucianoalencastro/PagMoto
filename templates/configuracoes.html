@@ -1,0 +1,162 @@
+{% extends "layout.html" %}
+
+{% block title %}Faixas & Loja{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Coluna Esquerda: Configurações da Loja + Nova Faixa -->
+    <div class="col-lg-4">
+        <!-- Dados da Loja -->
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0">Dados da Loja</h5>
+            </div>
+            <div class="card-body">
+                <form action="/configuracoes/loja" method="POST">
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome da Pizzaria / Delivery *</label>
+                        <input type="text" class="form-control" id="nome" name="nome" value="{{ loja.nome }}" required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="valor_encostada_padrao" class="form-label">Valor Padrão da Encostada (R$)</label>
+                        <input type="number" step="0.01" min="0" class="form-control" id="valor_encostada_padrao" name="valor_encostada_padrao" value="{{ '%.2f'|format(loja.valor_encostada_padrao or 0) }}">
+                        <div class="form-text">Valor sugerido automaticamente ao abrir um novo dia.</div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-dark fw-semibold">Salvar Dados da Loja</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Nova Faixa de KM -->
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white py-3">
+                <h5 class="fw-bold mb-0">Nova Faixa de KM</h5>
+            </div>
+            <div class="card-body">
+                <form action="/configuracoes/faixas" method="POST">
+                    <div class="mb-3">
+                        <label for="descricao" class="form-label">Descrição da Faixa *</label>
+                        <input type="text" class="form-control" id="descricao" name="descricao" placeholder="Ex: 0 a 6 km ou Acima de 12 km" required>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-7">
+                            <label for="valor" class="form-label">Valor por Entrega (R$) *</label>
+                            <input type="number" step="0.01" min="0.01" class="form-control" id="valor" name="valor" placeholder="10.00" required>
+                        </div>
+                        <div class="col-5">
+                            <label for="ordem" class="form-label">Ordem</label>
+                            <input type="number" min="1" class="form-control" id="ordem" name="ordem" value="{{ faixas|length + 1 }}">
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-dark fw-semibold">+ Adicionar Faixa</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Coluna Direita: Tabela de Faixas de Tarifa -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                <div>
+                    <h5 class="fw-bold mb-0">Faixas de Quilometragem</h5>
+                    <small class="text-muted">As faixas ativas aparecem como colunas na planilha de fechamento.</small>
+                </div>
+                <span class="badge bg-secondary">{{ faixas|length }} faixa(s)</span>
+            </div>
+            <div class="card-body p-0">
+                {% if not faixas %}
+                    <div class="p-4 text-center text-muted">
+                        Nenhuma faixa configurada. Adicione suas faixas de KM ao lado.
+                    </div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Ordem</th>
+                                    <th>Descrição (KM)</th>
+                                    <th>Valor</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for faixa in faixas %}
+                                <tr class="{% if not faixa.ativo %}table-secondary text-muted{% endif %}">
+                                    <td class="ps-3">{{ faixa.ordem }}º</td>
+                                    <td class="fw-semibold">{{ faixa.descricao }}</td>
+                                    <td>R$ {{ "%.2f"|format(faixa.valor)|replace('.', ',') }}</td>
+                                    <td>
+                                        {% if faixa.ativo %}
+                                            <span class="badge bg-success">Ativa</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inativa</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <button type="button" class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#modalEditarFaixa{{ faixa.id }}">
+                                            Editar
+                                        </button>
+
+                                        <form action="/configuracoes/faixas/{{ faixa.id }}/toggle" method="POST" class="d-inline">
+                                            {% if faixa.ativo %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Desativar</button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-sm btn-outline-success">Ativar</button>
+                                            {% endif %}
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <!-- Modal Editar Faixa -->
+                                <div class="modal fade" id="modalEditarFaixa{{ faixa.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form action="/configuracoes/faixas/{{ faixa.id }}/editar" method="POST">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title fw-bold">Editar Faixa de KM</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Descrição *</label>
+                                                        <input type="text" name="descricao" class="form-control" value="{{ faixa.descricao }}" required>
+                                                    </div>
+                                                    <div class="row g-2">
+                                                        <div class="col-7">
+                                                            <label class="form-label">Valor (R$) *</label>
+                                                            <input type="number" step="0.01" min="0.01" name="valor" class="form-control" value="{{ '%.2f'|format(faixa.valor) }}" required>
+                                                        </div>
+                                                        <div class="col-5">
+                                                            <label class="form-label">Ordem</label>
+                                                            <input type="number" min="1" name="ordem" class="form-control" value="{{ faixa.ordem }}" required>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-dark">Salvar Alterações</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

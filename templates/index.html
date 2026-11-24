@@ -1,0 +1,367 @@
+{% extends "layout.html" %}
+
+{% block title %}Fechamento {{ data_formatada }}{% endblock %}
+
+{% block content %}
+<!-- Cabeçalho visível apenas na impressão / PDF -->
+<div class="d-none d-print-block mb-4 border-bottom pb-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="fw-bold mb-0">{{ loja_atual.nome }}</h3>
+            <p class="text-muted mb-0">Relatório de Fechamento de Entregadores</p>
+        </div>
+        <div class="text-end">
+            <h5 class="fw-bold mb-0">Data: {{ data_formatada }}</h5>
+            <small class="text-muted">Gerado via PagMoto</small>
+        </div>
+    </div>
+</div>
+
+<!-- Barra de Controle Superior (oculta na impressão) -->
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 no-print">
+    <div>
+        <h4 class="fw-bold mb-1">
+            <i class="bi bi-table text-warning me-1"></i> Fechamento Diário
+            {% if ja_salvo %}
+                <span class="badge bg-success fs-6 ms-2"><i class="bi bi-check-circle me-1"></i> Salvo</span>
+            {% else %}
+                <span class="badge bg-warning text-dark fs-6 ms-2">Pendente</span>
+            {% endif %}
+        </h4>
+        <p class="text-muted small mb-0">Preencha as entregas por faixa de KM para calcular o acerto automaticamente.</p>
+    </div>
+
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <form action="/" method="GET" class="d-flex align-items-center gap-2">
+            <input type="date" name="data" value="{{ data_ref }}" class="form-control form-control-sm" onchange="this.form.submit()">
+        </form>
+
+        <a href="/fechamento/pdf?data={{ data_ref }}" class="btn btn-outline-secondary btn-sm">
+            Baixar PDF
+        </a>
+    </div>
+</div>
+
+{% if not linhas %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i> Você ainda não possui motoboys ativos cadastrados.
+        <a href="/motoboys" class="alert-link">Clique aqui para cadastrar seus entregadores</a>.
+    </div>
+{% else %}
+<form action="/" method="POST" id="form-fechamento">
+    <input type="hidden" name="data_fechamento" value="{{ data_ref }}">
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle mb-0 text-center" id="tabela-fechamento">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="text-start ps-3" style="min-width: 160px;">Motoboy</th>
+                            {% for f in faixas %}
+                                <th style="min-width: 95px;">
+                                    {{ f.descricao }}<br>
+                                    <small class="text-warning fw-normal">R$ {{ "%.2f"|format(f.valor) }}</small>
+                                </th>
+                            {% endfor %}
+                            <th style="min-width: 105px;">Encostada<br><small class="text-secondary fw-normal">(R$)</small></th>
+                            <th style="min-width: 105px;">Consumo<br><small class="text-danger fw-normal">(- R$)</small></th>
+                            <th style="min-width: 105px;">Haver Ant.<br><small class="text-info fw-normal">(+ R$)</small></th>
+                            <th class="bg-secondary text-white" style="min-width: 115px;">Total a Pagar</th>
+                            <th style="min-width: 110px;">Valor Pago<br><small class="text-success fw-normal">(R$)</small></th>
+                            <th style="min-width: 115px;">Forma Pagto</th>
+                            <th class="bg-secondary text-white" style="min-width: 110px;">Novo Haver</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in linhas %}
+                        {% set mb = item.motoboy %}
+                        <tr class="linha-motoboy">
+                            <td class="text-start ps-3 fw-semibold">
+                                {{ mb.nome }}
+                                {% if mb.chave_pix %}
+                                    <br><small class="text-muted fw-normal">Pix: {{ mb.chave_pix }}</small>
+                                {% endif %}
+                            </td>
+
+                            {% for f in faixas %}
+                            <td>
+                                <input type="number" min="0" step="1"
+                                       class="form-control form-control-sm text-center input-faixa"
+                                       name="mb_{{ mb.id }}_faixa_{{ f.id }}"
+                                       data-valor="{{ f.valor }}"
+                                       value="{{ item.qtds.get(f.id, 0) }}">
+                            </td>
+                            {% endfor %}
+
+                           <td>
+                                <select name="mb_{{ item.motoboy.id }}_encostada"
+                                        class="form-select form-select-sm input-encostada"
+                                        data-valor="{{ '%.2f'|format(valor_encostada_padrao) }}">
+                                    <option value="sim" {% if item.encostada > 0 %}selected{% endif %}>
+                                        Sim (R$ {{ "%.2f"|format(valor_encostada_padrao)|replace('.', ',') }})
+                                    </option>
+                                    <option value="nao" {% if item.encostada == 0 %}selected{% endif %}>
+                                        Não (R$ 0,00)
+                                    </option>
+                                </select>
+                            </td>
+
+                            <td>
+                                <input type="number" min="0" step="0.01"
+                                       class="form-control form-control-sm text-center input-consumo"
+                                       name="mb_{{ mb.id }}_consumo"
+                                       value="{{ '%.2f'|format(item.consumo) }}">
+                            </td>
+
+                            <td>
+                                <input type="text"
+                                    name="mb_{{ item.motoboy.id }}_haver_anterior"
+                                    readonly
+                                    tabindex="-1"
+                                    class="form-control form-control-sm text-end bg-light text-muted campo-haver-ant"
+                                    value="{{ '%.2f'|format(item.haver_anterior) }}">
+                            </td>
+
+                            <td class="fw-bold text-primary bg-light cell-total">
+                                R$ {{ "%.2f"|format(item.total_a_pagar) }}
+                            </td>
+
+                            <td>
+                                <input type="number" min="0" step="0.01"
+                                       class="form-control form-control-sm text-center input-pago"
+                                       name="mb_{{ mb.id }}_valor_pago"
+                                       value="{{ '%.2f'|format(item.valor_pago) }}">
+                            </td>
+
+                            <td>
+                                <select class="form-select form-select-sm" name="mb_{{ mb.id }}_forma_pagamento">
+                                    <option value="Pix" {% if item.forma_pagamento == 'Pix' %}selected{% endif %}>Pix</option>
+                                    <option value="Dinheiro" {% if item.forma_pagamento == 'Dinheiro' %}selected{% endif %}>Dinheiro</option>
+                                    <option value="Haver" {% if item.forma_pagamento == 'Haver' %}selected{% endif %}>Deixar Haver</option>
+                                </select>
+                            </td>
+
+                            <td class="fw-bold bg-light cell-novo-haver">
+                                R$ {{ "%.2f"|format(item.novo_haver) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light fw-bold">
+                        <tr>
+                            <td colspan="{{ faixas|length + 4 }}" class="text-end pe-3">TOTAIS DO DIA:</td>
+                            <td class="text-primary" id="rodape-total-pagar">R$ 0.00</td>
+                            <td class="text-success" id="rodape-total-pago">R$ 0.00</td>
+                            <td></td>
+                            <td id="rodape-total-haver">R$ 0.00</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- Seção Inferior: Recebimentos em Dinheiro e Observações -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+                    <h6 class="fw-bold mb-0">
+                        <i class="bi bi-cash-coin text-success me-1"></i> Recebimentos em Dinheiro (Pedidos)
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-success no-print" onclick="adicionarLinhaDinheiro()">
+                        <i class="bi bi-plus-lg"></i> Adicionar Pedido
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" id="tabela-dinheiro">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Motoboy</th>
+                                    <th>Nº Pedido</th>
+                                    <th>Valor (R$)</th>
+                                    <th class="no-print" style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="lista-dinheiro">
+                                {% for rec in recebimentos %}
+                                <tr>
+                                    <td>
+                                        <select name="rec_motoboy_id[]" class="form-select form-select-sm">
+                                            {% for item in linhas %}
+                                                <option value="{{ item.motoboy.id }}" {% if item.motoboy.id == rec.motoboy_id %}selected{% endif %}>
+                                                    {{ item.motoboy.nome }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="text" name="rec_pedido[]" class="form-control form-control-sm" value="{{ rec.numero_pedido }}" placeholder="Ex: #104">
+                                    </td>
+                                    <td>
+                                        <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" value="{{ '%.2f'|format(rec.valor) }}">
+                                    </td>
+                                    <td class="no-print text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerLinhaDinheiro(this)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr class="fw-bold">
+                                    <td colspan="2" class="text-end">Total em Dinheiro a Recolher:</td>
+                                    <td class="text-success" id="total-dinheiro">R$ 0.00</td>
+                                    <td class="no-print"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white py-3">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-journal-text me-1"></i> Observações do Fechamento</h6>
+                </div>
+                <div class="card-body">
+                    <textarea name="observacoes" class="form-control" rows="5" placeholder="Anote ocorrências, vales extras ou detalhes do turno...">{{ observacoes }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-5 no-print">
+        <button type="submit" class="btn btn-dark btn-lg px-5 fw-bold shadow-sm">
+            <i class="bi bi-save me-2"></i> Salvar Fechamento do Dia
+        </button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function recalcularPlanilha() {
+        let somaTotalPagar = 0;
+        let somaTotalPago = 0;
+        let somaNovoHaver = 0;
+
+        document.querySelectorAll('.linha-motoboy').forEach(linha => {
+            let totalEntregas = 0;
+            linha.querySelectorAll('.input-faixa').forEach(input => {
+                const qtd = parseFloat(input.value) || 0;
+                const valorUnit = parseFloat(input.dataset.valor) || 0;
+                totalEntregas += qtd * valorUnit;
+            });
+
+            const elEncostada = linha.querySelector('.input-encostada');
+            let encostada = 0;
+            if (elEncostada) {
+                encostada = (elEncostada.value === 'sim')
+                    ? (parseFloat(elEncostada.dataset.valor) || 0)
+                    : 0;
+            }
+
+            const elConsumo = linha.querySelector('.input-consumo');
+            const elHaverAnt = linha.querySelector('.input-haver-ant');
+            const elPago = linha.querySelector('.input-pago');
+
+            const consumo = elConsumo ? (parseFloat(elConsumo.value) || 0) : 0;
+            const haverAnt = elHaverAnt ? (parseFloat(elHaverAnt.value) || 0) : 0;
+            const pago = elPago ? (parseFloat(elPago.value) || 0) : 0;
+
+            const totalPagar = totalEntregas + encostada + haverAnt - consumo;
+            const novoHaver = totalPagar - pago;
+
+            linha.querySelector('.cell-total').textContent = 'R$ ' + totalPagar.toFixed(2);
+            const cellHaver = linha.querySelector('.cell-novo-haver');
+            cellHaver.textContent = 'R$ ' + novoHaver.toFixed(2);
+
+            if (novoHaver > 0) {
+                cellHaver.classList.add('text-warning');
+                cellHaver.classList.remove('text-danger', 'text-dark');
+            } else if (novoHaver < 0) {
+                cellHaver.classList.add('text-danger');
+                cellHaver.classList.remove('text-warning', 'text-dark');
+            } else {
+                cellHaver.classList.add('text-dark');
+                cellHaver.classList.remove('text-warning', 'text-danger');
+            }
+
+            somaTotalPagar += totalPagar;
+            somaTotalPago += pago;
+            somaNovoHaver += novoHaver;
+        });
+
+        const elPagar = document.getElementById('rodape-total-pagar');
+        if (elPagar) {
+            elPagar.textContent = 'R$ ' + somaTotalPagar.toFixed(2);
+            document.getElementById('rodape-total-pago').textContent = 'R$ ' + somaTotalPago.toFixed(2);
+            document.getElementById('rodape-total-haver').textContent = 'R$ ' + somaNovoHaver.toFixed(2);
+        }
+
+        recalcularDinheiro();
+    }
+
+    function recalcularDinheiro() {
+        let totalDin = 0;
+        document.querySelectorAll('.input-dinheiro-valor').forEach(input => {
+            totalDin += parseFloat(input.value) || 0;
+        });
+        const elDin = document.getElementById('total-dinheiro');
+        if (elDin) {
+            elDin.textContent = 'R$ ' + totalDin.toFixed(2);
+        }
+    }
+
+    function adicionarLinhaDinheiro() {
+        const tbody = document.getElementById('lista-dinheiro');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <select name="rec_motoboy_id[]" class="form-select form-select-sm">
+                    {% for item in linhas %}
+                        <option value="{{ item.motoboy.id }}">{{ item.motoboy.nome }}</option>
+                    {% endfor %}
+                </select>
+            </td>
+            <td>
+                <input type="text" name="rec_pedido[]" class="form-control form-control-sm" placeholder="Ex: #105">
+            </td>
+            <td>
+                <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" value="0.00">
+            </td>
+            <td class="no-print text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerLinhaDinheiro(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        tr.querySelector('.input-dinheiro-valor').addEventListener('input', recalcularDinheiro);
+    }
+
+    function removerLinhaDinheiro(btn) {
+        btn.closest('tr').remove();
+        recalcularDinheiro();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('#tabela-fechamento input').forEach(input => {
+            input.addEventListener('input', recalcularPlanilha);
+        });
+        document.querySelectorAll('#tabela-fechamento select.input-encostada').forEach(sel => {
+            sel.addEventListener('change', recalcularPlanilha);
+        });
+        document.querySelectorAll('.input-dinheiro-valor').forEach(input => {
+            input.addEventListener('input', recalcularDinheiro);
+        });
+        recalcularPlanilha();
+    });
+</script>
+{% endblock %}

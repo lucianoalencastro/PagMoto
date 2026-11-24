@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+    <head>
+
+        <meta charset="utf-8">
+        <meta name="viewport" content="initial-scale=1, width=device-width">
+
+        <link rel="shortcut icon" href="{{ url_for('static', filename='images/Logopagmotoicon.png') }}?v=3" type="image/png">
+        <link rel="icon" href="{{ url_for('static', filename='images/Logopagmotoicon.png') }}?v=3" type="image/png" sizes="any">
+        <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/Logopagmotoicon.png') }}?v=3">
+
+        <!-- Bootstrap 5.3 -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+              rel="stylesheet"
+              integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+              crossorigin="anonymous">
+
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+                integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYjWnR..."
+                crossorigin="anonymous"></script>
+
+        <!-- CSS próprio -->
+        <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+
+        <title>PagMoto: {% block title %}{% endblock %}</title>
+
+    </head>
+
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- Barra de Navegação (oculta na impressão) -->
+    <nav class="bg-light border-bottom navbar navbar-expand-md navbar-light no-print">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='images/Logopagmoto_preto.png') }}" alt="PagMoto" style="height: 36px; width: auto;">
+            </a>
+
+            <button aria-controls="navbar"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation"
+                    class="navbar-toggler"
+                    data-bs-target="#navbar"
+                    data-bs-toggle="collapse"
+                    type="button">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbar">
+                {% if session.get("user_id") %}
+                    <ul class="navbar-nav me-auto mt-2 mt-md-0">
+                        {% if loja_atual %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="/">Fechamento do Dia</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/historico">Histórico</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/motoboys">Motoboys</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="/configuracoes">Faixas &amp; Loja</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+
+                    <ul class="navbar-nav ms-auto mt-2 mt-md-0 align-items-md-center gap-2">
+                        {% if loja_atual %}
+                            <li class="nav-item">
+                                <span class="badge bg-dark py-2 px-3">{{ loja_atual.nome }}</span>
+                            </li>
+                        {% endif %}
+
+                        {% if minhas_lojas|length > 1 %}
+                            <li class="nav-item">
+                                <a class="btn btn-outline-dark btn-sm" href="/selecionar-loja">Trocar Loja</a>
+                            </li>
+                        {% endif %}
+
+                        {% if usuario_atual %}
+                            <li class="nav-item">
+                                <span class="nav-link text-muted small">Olá, <strong class="text-dark">{{ usuario_atual.nome }}</strong></span>
+                            </li>
+                        {% endif %}
+
+                        <li class="nav-item">
+                            <a class="nav-link text-danger fw-medium" href="/logout">Sair</a>
+                        </li>
+                    </ul>
+                {% else %}
+                    <ul class="navbar-nav ms-auto mt-2 mt-md-0">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/register">Cadastrar</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/login">Entrar</a>
+                        </li>
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mensagens de Alerta (Flash) -->
+    <div class="container mt-3 no-print">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Conteúdo Principal -->
+    <main class="container-fluid px-4 py-4 flex-grow-1">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Rodapé Escuro (para destacar a logo branca) -->
+    <footer class="bg-dark border-top mt-5 pt-5 pb-4 text-secondary no-print">
+        <div class="container">
+            <div class="row gy-4 mb-4">
+
+                <!-- Coluna 1: Marca e Descrição -->
+                <div class="col-md-5">
+                    <img src="{{ url_for('static', filename='images/Logopagmoto_branco.png') }}" alt="PagMoto" style="height: 38px; width: auto;" class="mb-3">
+                    <p class="small mb-0">
+                        Fechamento diário de entregas, controle de faixas de KM, saldo haver e recebimentos em dinheiro com agilidade e precisão.
+                    </p>
+                </div>
+
+                <!-- Coluna 2: Links Rápidos -->
+                <div class="col-md-3 offset-md-1">
+                    <h6 class="text-white fw-semibold mb-3">Navegação</h6>
+                    <ul class="list-unstyled small d-flex flex-column gap-2 mb-0">
+                        <li><a href="/" class="text-secondary text-decoration-none">Fechamento do Dia</a></li>
+                        <li><a href="/historico" class="text-secondary text-decoration-none">Histórico</a></li>
+                        <li><a href="/motoboys" class="text-secondary text-decoration-none">Motoboys</a></li>
+                        <li><a href="/configuracoes" class="text-secondary text-decoration-none">Faixas &amp; Loja</a></li>
+                    </ul>
+                </div>
+
+                <!-- Coluna 3: Suporte / Segurança -->
+                <div class="col-md-3">
+                    <h6 class="text-white fw-semibold mb-3">Suporte</h6>
+                    <p class="small mb-1">suporte@pagmoto.com.br</p>
+                    <p class="small text-success fw-medium mb-0">Ambiente Seguro (SSL)</p>
+                </div>
+
+            </div>
+
+            <hr class="border-secondary my-4">
+
+            <!-- Barra Inferior: Direitos Autorais -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small">
+                <span>&copy; 2026 <strong class="text-white">PagMoto</strong>. Todos os direitos reservados.</span>
+                <span>Desenvolvido por <strong class="text-white">Luciano Garcia</strong> com Python, Flask &amp; Bootstrap</span>
+            </div>
+
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

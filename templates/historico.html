@@ -1,0 +1,185 @@
+{% extends "layout.html" %}
+
+{% block title %}Histórico & Extratos{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h4 class="fw-bold mb-0">Histórico de Fechamentos</h4>
+        <small class="text-muted">Consulte dias anteriores ou filtre o extrato individual de um motoboy.</small>
+    </div>
+    <a href="/" class="btn btn-dark btn-sm fw-semibold">+ Novo / Fechamento de Hoje</a>
+</div>
+
+<!-- Barra de Filtros -->
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+        <form action="/historico" method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label for="motoboy_id" class="form-label small fw-semibold">Filtrar por Motoboy (Extrato)</label>
+                <select name="motoboy_id" id="motoboy_id" class="form-select">
+                    <option value="0">Todos (Visão Geral por Dia)</option>
+                    {% for mb in motoboys %}
+                        <option value="{{ mb.id }}" {% if filtros.motoboy_id == mb.id %}selected{% endif %}>
+                            {{ mb.nome }} {% if not mb.ativo %}(Inativo){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-md-3">
+                <label for="data_inicio" class="form-label small fw-semibold">Data Inicial</label>
+                <input type="date" name="data_inicio" id="data_inicio" class="form-control" value="{{ filtros.data_inicio }}">
+            </div>
+
+            <div class="col-md-3">
+                <label for="data_fim" class="form-label small fw-semibold">Data Final</label>
+                <input type="date" name="data_fim" id="data_fim" class="form-control" value="{{ filtros.data_fim }}">
+            </div>
+
+            <div class="col-md-2 d-flex gap-2">
+                <button type="submit" class="btn btn-dark w-100 fw-semibold">Filtrar</button>
+                {% if filtros.data_inicio or filtros.data_fim or filtros.motoboy_id %}
+                    <a href="/historico" class="btn btn-outline-secondary" title="Limpar filtros">Limpar</a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Cards de Resumo do Período -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-4 border-success">
+            <div class="card-body">
+                <small class="text-muted text-uppercase fw-semibold">Total Pago no Período</small>
+                <h4 class="fw-bold text-success mb-0 mt-1">R$ {{ "%.2f"|format(resumo.total_pago)|replace('.', ',') }}</h4>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-4 border-warning">
+            <div class="card-body">
+                <small class="text-muted text-uppercase fw-semibold">
+                    {% if motoboy_selecionado %}Saldo Haver Atual ({{ motoboy_selecionado.nome }}){% else %}Total Haver Gerado{% endif %}
+                </small>
+                <h4 class="fw-bold text-warning mb-0 mt-1">R$ {{ "%.2f"|format(resumo.total_haver)|replace('.', ',') }}</h4>
+            </div>
+        </div>
+    </div>
+
+    {% if not motoboy_selecionado %}
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 border-start border-4 border-primary">
+            <div class="card-body">
+                <small class="text-muted text-uppercase fw-semibold">Dinheiro Recebido (Pedidos)</small>
+                <h4 class="fw-bold text-primary mb-0 mt-1">R$ {{ "%.2f"|format(resumo.total_dinheiro)|replace('.', ',') }}</h4>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Tabela de Resultados -->
+<div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+        {% if motoboy_selecionado %}
+            <!-- VISÃO 1: EXTRATO INDIVIDUAL DO MOTOBOY -->
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Extrato: {{ motoboy_selecionado.nome }}</h5>
+                <span class="badge bg-dark">{{ extrato_motoboy|length }} turno(s)</span>
+            </div>
+
+            {% if not extrato_motoboy %}
+                <div class="p-4 text-center text-muted">Nenhum lançamento encontrado para este motoboy no período selecionado.</div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Data</th>
+                                <th class="text-center">Entregas</th>
+                                <th class="text-end">Encostada</th>
+                                <th class="text-end">Consumo</th>
+                                <th class="text-end">Haver Ant.</th>
+                                <th class="text-end">Total a Pagar</th>
+                                <th class="text-end">Valor Pago</th>
+                                <th class="text-center">Forma</th>
+                                <th class="text-end">Novo Haver</th>
+                                <th class="text-end pe-3">Planilha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in extrato_motoboy %}
+                            <tr>
+                                <td class="ps-3 fw-semibold">{{ item.data.strftime('%d/%m/%Y') }}</td>
+                                <td class="text-center"><span class="badge bg-secondary">{{ item.qtd_entregas }}</span></td>
+                                <td class="text-end">R$ {{ "%.2f"|format(item.encostada)|replace('.', ',') }}</td>
+                                <td class="text-end text-danger">- R$ {{ "%.2f"|format(item.consumo)|replace('.', ',') }}</td>
+                                <td class="text-end">R$ {{ "%.2f"|format(item.haver_anterior)|replace('.', ',') }}</td>
+                                <td class="text-end fw-bold">R$ {{ "%.2f"|format(item.total_a_pagar)|replace('.', ',') }}</td>
+                                <td class="text-end text-success fw-semibold">R$ {{ "%.2f"|format(item.valor_pago)|replace('.', ',') }}</td>
+                                <td class="text-center">{{ item.forma_pagamento }}</td>
+                                <td class="text-end fw-bold {% if item.novo_haver > 0 %}text-warning{% endif %}">
+                                    R$ {{ "%.2f"|format(item.novo_haver)|replace('.', ',') }}
+                                </td>
+                                <td class="text-end pe-3">
+                                    <a href="/?data={{ item.data.strftime('%Y-%m-%d') }}" class="btn btn-sm btn-outline-dark">Abrir Dia</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+
+        {% else %}
+            <!-- VISÃO 2: HISTÓRICO GERAL POR DATA -->
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Dias Fechados</h5>
+                <span class="badge bg-dark">{{ fechamentos|length }} dia(s)</span>
+            </div>
+
+            {% if not fechamentos %}
+                <div class="p-4 text-center text-muted">Nenhum fechamento encontrado para o período selecionado.</div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-3">Data</th>
+                                <th class="text-center">Motoboys</th>
+                                <th class="text-center">Entregas</th>
+                                <th class="text-end">Total Pago</th>
+                                <th class="text-end">Haver Gerado</th>
+                                <th class="text-end">Dinheiro (Pedidos)</th>
+                                <th>Observações</th>
+                                <th class="text-end pe-3">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for f in fechamentos %}
+                            <tr>
+                                <td class="ps-3 fw-bold">{{ f.data.strftime('%d/%m/%Y') }}</td>
+                                <td class="text-center">{{ f.qtd_motoboys }}</td>
+                                <td class="text-center"><span class="badge bg-secondary">{{ f.total_entregas }}</span></td>
+                                <td class="text-end text-success fw-semibold">R$ {{ "%.2f"|format(f.total_pago)|replace('.', ',') }}</td>
+                                <td class="text-end {% if f.total_haver > 0 %}text-warning fw-semibold{% endif %}">
+                                    R$ {{ "%.2f"|format(f.total_haver)|replace('.', ',') }}
+                                </td>
+                                <td class="text-end text-primary">R$ {{ "%.2f"|format(f.total_dinheiro)|replace('.', ',') }}</td>
+                                <td class="text-muted small">{{ (f.observacoes[:35] ~ '...') if f.observacoes and f.observacoes|length > 35 else (f.observacoes or '-') }}</td>
+                                <td class="text-end pe-3">
+                                    <a href="/?data={{ f.data.strftime('%Y-%m-%d') }}" class="btn btn-sm btn-outline-dark">Abrir / Editar</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
