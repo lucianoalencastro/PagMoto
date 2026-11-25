@@ -1,0 +1,16 @@
+{
+  "name": "PagMoto - Extrato do Entregador",
+  "short_name": "PagMoto",
+  "description": "Acompanhe suas entregas, vales e pagamentos em tempo real.",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#212529",
+  "icons": [
+    {
+      "src": "/static/images/Logopagmotoicon.png",
+      "sizes": "200x200",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
