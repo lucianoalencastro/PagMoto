@@ -6,7 +6,7 @@
   "theme_color": "#ffffff",
   "icons": [
     {
-      "src": "/static/images/Logopagmotoicon.png?v=4",
+      "src": "/static/images/Logopagmotoicon-pwa.png?v=7",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
