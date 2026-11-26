@@ -157,7 +157,12 @@
 
             <!-- Barra Inferior: Direitos Autorais -->
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small">
-                <span>&copy; 2026 <strong class="text-white">PagMoto</strong>. Todos os direitos reservados.</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span>&copy; 2026 <strong class="text-white">PagMoto</strong>. Todos os direitos reservados.</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary fw-normal">
+                        Versão {{ app_version }}
+                    </span>
+                </div>
                 <span>Desenvolvido por <strong class="text-white">Luciano Garcia</strong> com Python, Flask &amp; Bootstrap</span>
             </div>
 

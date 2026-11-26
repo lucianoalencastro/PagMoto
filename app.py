@@ -44,6 +44,11 @@ def after_request(response):
 
 
 @app.context_processor
+def inject_app_version():
+    return {"app_version": "v1.1"}
+
+
+@app.context_processor
 def inject_global_data():
     usuario = None
     loja_atual = None
@@ -129,6 +134,17 @@ def login():
 def logout():
     session.clear()
     return redirect("/login")
+
+@app.route("/api/rascunho-dinheiro", methods=["POST"])
+@loja_required
+def salvar_rascunho_dinheiro():
+    dados = request.get_json(silent=True) or {}
+    fechamento_service.sincronizar_rascunho_dinheiro(
+        session["loja_id"],
+        dados.get("data"),
+        dados.get("itens", [])
+    )
+    return {"ok": True}
 
 
 @app.route("/motoboys", methods=["GET", "POST"])

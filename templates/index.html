@@ -64,18 +64,20 @@
                                     <small class="text-warning fw-normal">R$ {{ "%.2f"|format(f.valor) }}</small>
                                 </th>
                             {% endfor %}
-                            <th style="min-width: 105px;">Encostada<br><small class="text-secondary fw-normal">(R$)</small></th>
+                            <th style="min-width: 130px;">Encostada / Extra<br><small class="text-secondary fw-normal">(R$)</small></th>
                             <th style="min-width: 105px;">Consumo<br><small class="text-danger fw-normal">(- R$)</small></th>
                             <th style="min-width: 105px;">Haver Ant.<br><small class="text-info fw-normal">(+ R$)</small></th>
                             <th class="bg-secondary text-white" style="min-width: 115px;">Total a Pagar</th>
-                            <th style="min-width: 110px;">Valor Pago<br><small class="text-success fw-normal">(R$)</small></th>
-                            <th style="min-width: 115px;">Forma Pagto</th>
+                            <th style="min-width: 130px;">Valor Pago<br><small class="text-success fw-normal">(R$)</small></th>
+                            <th style="min-width: 120px;">Forma Pagto</th>
                             <th class="bg-secondary text-white" style="min-width: 110px;">Novo Haver</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in linhas %}
                         {% set mb = item.motoboy %}
+                        {% set tem_extra = item.extra and item.extra > 0 %}
+                        {% set tem_pagto_2 = item.valor_pago_2 and item.valor_pago_2 > 0 %}
                         <tr class="linha-motoboy">
                             <td class="text-start ps-3 fw-semibold">
                                 {{ mb.nome }}
@@ -86,32 +88,48 @@
 
                             {% for f in faixas %}
                             <td>
+                                {% set qtd_atual = item.qtds.get(f.id, 0) %}
                                 <input type="number" min="0" step="1"
-                                       class="form-control form-control-sm text-center input-faixa"
-                                       name="mb_{{ mb.id }}_faixa_{{ f.id }}"
-                                       data-valor="{{ f.valor }}"
-                                       value="{{ item.qtds.get(f.id, 0) }}">
+                                    class="form-control form-control-sm text-center input-faixa"
+                                    name="mb_{{ mb.id }}_faixa_{{ f.id }}"
+                                    data-valor="{{ f.valor }}"
+                                    placeholder="0"
+                                    value="{{ qtd_atual if qtd_atual > 0 else '' }}">
                             </td>
                             {% endfor %}
 
-                           <td>
-                                <select name="mb_{{ item.motoboy.id }}_encostada"
-                                        class="form-select form-select-sm input-encostada"
-                                        data-valor="{{ '%.2f'|format(valor_encostada_padrao) }}">
-                                    <option value="sim" {% if item.encostada > 0 %}selected{% endif %}>
-                                        Sim (R$ {{ "%.2f"|format(valor_encostada_padrao)|replace('.', ',') }})
-                                    </option>
-                                    <option value="nao" {% if item.encostada == 0 %}selected{% endif %}>
-                                        Não (R$ 0,00)
-                                    </option>
-                                </select>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <select name="mb_{{ item.motoboy.id }}_encostada"
+                                            class="form-select form-select-sm input-encostada"
+                                            data-valor="{{ '%.2f'|format(valor_encostada_padrao) }}">
+                                        <option value="sim" {% if item.encostada > 0 %}selected{% endif %}>
+                                            Sim (R$ {{ "%.2f"|format(valor_encostada_padrao)|replace('.', ',') }})
+                                        </option>
+                                        <option value="nao" {% if item.encostada == 0 %}selected{% endif %}>
+                                            Não (R$ 0,00)
+                                        </option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-outline-success px-2"
+                                            title="Adicionar valor extra por fora"
+                                            onclick="toggleExtra(this)">+</button>
+                                </div>
+                                <div class="mt-1 campo-extra {% if not tem_extra %}d-none{% endif %}">
+                                    <input type="number" min="0" step="0.01"
+                                        class="form-control form-control-sm text-center input-extra"
+                                        name="mb_{{ mb.id }}_extra"
+                                        placeholder="0,00"
+                                        value="{{ '%.2f'|format(item.extra) if item.extra and item.extra > 0 else '' }}">
+                                </div>
                             </td>
 
                             <td>
                                 <input type="number" min="0" step="0.01"
-                                       class="form-control form-control-sm text-center input-consumo"
-                                       name="mb_{{ mb.id }}_consumo"
-                                       value="{{ '%.2f'|format(item.consumo) }}">
+                                    class="form-control form-control-sm text-center input-consumo"
+                                    name="mb_{{ mb.id }}_consumo"
+                                    placeholder="0,00"
+                                    value="{{ '%.2f'|format(item.consumo) if item.consumo and item.consumo > 0 else '' }}">
+
                             </td>
 
                             <td>
@@ -128,10 +146,24 @@
                             </td>
 
                             <td>
-                                <input type="number" min="0" step="0.01"
-                                       class="form-control form-control-sm text-center input-pago"
-                                       name="mb_{{ mb.id }}_valor_pago"
-                                       value="{{ '%.2f'|format(item.valor_pago) }}">
+                                <div class="input-group input-group-sm">
+                                    <input type="number" min="0" step="0.01"
+                                        class="form-control text-center input-pago"
+                                        name="mb_{{ mb.id }}_valor_pago"
+                                        placeholder="0,00"
+                                        value="{{ '%.2f'|format(item.valor_pago) if item.valor_pago and item.valor_pago > 0 else '' }}">
+
+                                    <button type="button" class="btn btn-outline-secondary px-2 btn-toggle-pagto2"
+                                            title="Adicionar 2ª forma de pagamento"
+                                            onclick="togglePagto2(this)">+</button>
+                                </div>
+                                <div class="mt-1 campo-pagto-2 {% if not tem_pagto_2 %}d-none{% endif %}">
+                                    <input type="number" min="0" step="0.01"
+                                        class="form-control form-control-sm text-center input-pago-2"
+                                        name="mb_{{ mb.id }}_valor_pago_2"
+                                        placeholder="0,00"
+                                        value="{{ '%.2f'|format(item.valor_pago_2) if item.valor_pago_2 and item.valor_pago_2 > 0 else '' }}">
+                                </div>
                             </td>
 
                             <td>
@@ -140,6 +172,13 @@
                                     <option value="Dinheiro" {% if item.forma_pagamento == 'Dinheiro' %}selected{% endif %}>Dinheiro</option>
                                     <option value="Haver" {% if item.forma_pagamento == 'Haver' %}selected{% endif %}>Deixar Haver</option>
                                 </select>
+                                <div class="mt-1 campo-pagto-2 {% if not tem_pagto_2 %}d-none{% endif %}">
+                                    <select class="form-select form-select-sm" name="mb_{{ mb.id }}_forma_pagamento_2">
+                                        <option value="Dinheiro" {% if item.forma_pagamento_2 == 'Dinheiro' %}selected{% endif %}>Dinheiro</option>
+                                        <option value="Pix" {% if item.forma_pagamento_2 == 'Pix' %}selected{% endif %}>Pix</option>
+                                        <option value="Cartão" {% if item.forma_pagamento_2 == 'Cartão' %}selected{% endif %}>Cartão</option>
+                                    </select>
+                                </div>
                             </td>
 
                             <td class="fw-bold bg-light cell-novo-haver">
@@ -200,7 +239,7 @@
                                         <input type="text" name="rec_pedido[]" class="form-control form-control-sm" value="{{ rec.numero_pedido }}" placeholder="Ex: #104">
                                     </td>
                                     <td>
-                                        <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" value="{{ '%.2f'|format(rec.valor) }}">
+                                        <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" placeholder="0,00" value="{{ '%.2f'|format(rec.valor) if rec.valor and rec.valor > 0 else '' }}">
                                     </td>
                                     <td class="no-print text-center">
                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerLinhaDinheiro(this)">
@@ -246,6 +285,40 @@
 
 {% block scripts %}
 <script>
+    const FECHAMENTO_JA_SALVO = JSON.parse('{{ "true" if ja_salvo else "false" }}');
+    let timerRascunho = null;
+
+    function toggleExtra(btn) {
+        const linha = btn.closest('tr');
+        const box = linha.querySelector('.campo-extra');
+        const input = box.querySelector('input');
+        box.classList.toggle('d-none');
+
+        if (box.classList.contains('d-none')) {
+            input.value = '';
+            recalcularPlanilha();
+        } else {
+            input.focus();
+        }
+    }
+
+    function togglePagto2(btn) {
+        const linha = btn.closest('tr');
+        const boxes = linha.querySelectorAll('.campo-pagto-2');
+        const fechando = !boxes[0].classList.contains('d-none');
+
+        boxes.forEach(el => el.classList.toggle('d-none'));
+
+        if (fechando) {
+            const input2 = linha.querySelector('.input-pago-2');
+            if (input2) input2.value = '';
+            recalcularPlanilha();
+        } else {
+            const input2 = linha.querySelector('.input-pago-2');
+            if (input2) input2.focus();
+        }
+    }
+
     function recalcularPlanilha() {
         let somaTotalPagar = 0;
         let somaTotalPago = 0;
@@ -267,16 +340,21 @@
                     : 0;
             }
 
+            const elExtra = linha.querySelector('.input-extra');
             const elConsumo = linha.querySelector('.input-consumo');
             const elHaverAnt = linha.querySelector('.input-haver-ant');
             const elPago = linha.querySelector('.input-pago');
+            const elPago2 = linha.querySelector('.input-pago-2');
 
+            const extra = elExtra ? (parseFloat(elExtra.value) || 0) : 0;
             const consumo = elConsumo ? (parseFloat(elConsumo.value) || 0) : 0;
             const haverAnt = elHaverAnt ? (parseFloat(elHaverAnt.value) || 0) : 0;
-            const pago = elPago ? (parseFloat(elPago.value) || 0) : 0;
+            const pago1 = elPago ? (parseFloat(elPago.value) || 0) : 0;
+            const pago2 = elPago2 ? (parseFloat(elPago2.value) || 0) : 0;
+            const pagoTotal = pago1 + pago2;
 
-            const totalPagar = totalEntregas + encostada + haverAnt - consumo;
-            const novoHaver = totalPagar - pago;
+            const totalPagar = totalEntregas + encostada + extra + haverAnt - consumo;
+            const novoHaver = totalPagar - pagoTotal;
 
             linha.querySelector('.cell-total').textContent = 'R$ ' + totalPagar.toFixed(2);
             const cellHaver = linha.querySelector('.cell-novo-haver');
@@ -294,7 +372,7 @@
             }
 
             somaTotalPagar += totalPagar;
-            somaTotalPago += pago;
+            somaTotalPago += pagoTotal;
             somaNovoHaver += novoHaver;
         });
 
@@ -319,6 +397,52 @@
         }
     }
 
+    function agendarSalvarRascunhoDinheiro() {
+        if (FECHAMENTO_JA_SALVO) return;
+        clearTimeout(timerRascunho);
+        timerRascunho = setTimeout(() => {
+            const dataFechamento = document.querySelector('input[name="data_fechamento"]').value;
+            const itens = [];
+            document.querySelectorAll('#lista-dinheiro tr').forEach(tr => {
+                const motoboy_id = tr.querySelector('select[name="rec_motoboy_id[]"]').value;
+                const pedido = tr.querySelector('input[name="rec_pedido[]"]').value;
+                const valor = tr.querySelector('input[name="rec_valor[]"]').value;
+                itens.push({ motoboy_id, pedido, valor });
+            });
+
+            fetch('/api/rascunho-dinheiro', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: dataFechamento, itens })
+            });
+        }, 400);
+    }
+
+    function vincularEventosLinhaDinheiro(tr) {
+        tr.querySelector('select').addEventListener('change', agendarSalvarRascunhoDinheiro);
+        tr.querySelector('input[name="rec_pedido[]"]').addEventListener('input', agendarSalvarRascunhoDinheiro);
+
+        const inputVal = tr.querySelector('.input-dinheiro-valor');
+        inputVal.addEventListener('input', () => {
+            recalcularDinheiro();
+            agendarSalvarRascunhoDinheiro();
+        });
+        inputVal.addEventListener('blur', () => {
+            formatarCasaDecimal(inputVal);
+            agendarSalvarRascunhoDinheiro();
+        });
+    }
+
+    function formatarCasaDecimal(input) {
+        if (!input.value) return;
+        const num = parseFloat(input.value.replace(',', '.'));
+        if (!isNaN(num) && num > 0) {
+            input.value = num.toFixed(2);
+        } else {
+            input.value = '';
+        }
+    }
+
     function adicionarLinhaDinheiro() {
         const tbody = document.getElementById('lista-dinheiro');
         const tr = document.createElement('tr');
@@ -334,7 +458,7 @@
                 <input type="text" name="rec_pedido[]" class="form-control form-control-sm" placeholder="Ex: #105">
             </td>
             <td>
-                <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" value="0.00">
+                <input type="number" step="0.01" name="rec_valor[]" class="form-control form-control-sm input-dinheiro-valor" placeholder="0,00">
             </td>
             <td class="no-print text-center">
                 <button type="button" class="btn btn-sm btn-outline-danger" onclick="removerLinhaDinheiro(this)">
@@ -343,23 +467,41 @@
             </td>
         `;
         tbody.appendChild(tr);
-        tr.querySelector('.input-dinheiro-valor').addEventListener('input', recalcularDinheiro);
+        vincularEventosLinhaDinheiro(tr);
+        tr.querySelector('input[name="rec_pedido[]"]').focus();
     }
 
     function removerLinhaDinheiro(btn) {
         btn.closest('tr').remove();
         recalcularDinheiro();
+        agendarSalvarRascunhoDinheiro();
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Bloqueia Enter de submeter o formulario principal (exceto dentro do textarea de observacoes)
+        const form = document.getElementById('form-fechamento');
+        if (form) {
+            form.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    e.target.blur(); // Confirma visualmente o valor digitado no campo
+                }
+            });
+        }
+
+        const seletorDinheiro = '.input-extra, .input-consumo, .input-pago, .input-pago-2, .input-dinheiro-valor';
+        document.querySelectorAll(seletorDinheiro).forEach(input => {
+            input.addEventListener('blur', () => formatarCasaDecimal(input));
+        });
+
         document.querySelectorAll('#tabela-fechamento input').forEach(input => {
             input.addEventListener('input', recalcularPlanilha);
         });
         document.querySelectorAll('#tabela-fechamento select.input-encostada').forEach(sel => {
             sel.addEventListener('change', recalcularPlanilha);
         });
-        document.querySelectorAll('.input-dinheiro-valor').forEach(input => {
-            input.addEventListener('input', recalcularDinheiro);
+        document.querySelectorAll('#lista-dinheiro tr').forEach(tr => {
+            vincularEventosLinhaDinheiro(tr);
         });
         recalcularPlanilha();
     });

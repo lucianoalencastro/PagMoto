@@ -81,39 +81,51 @@
             </div>
         {% else %}
             {% for item in extrato %}
-            <div class="card border-0 shadow-sm mb-2">
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="fw-bold fs-6">{{ item.data.strftime('%d/%m/%Y') }}</span>
-                        <span class="badge bg-dark">{{ item.qtd_entregas }} entrega(s)</span>
-                    </div>
-
-                    <div class="row g-1 small text-muted mb-2">
-                        <div class="col-6">Entregas: <strong class="text-dark">R$ {{ "%.2f"|format(item.valor_entregas)|replace('.', ',') }}</strong></div>
-                        <div class="col-6 text-end">Encostada: <strong class="text-dark">R$ {{ "%.2f"|format(item.encostada)|replace('.', ',') }}</strong></div>
-                        {% if item.consumo > 0 %}
-                            <div class="col-6 text-danger">Consumo/Vale: - R$ {{ "%.2f"|format(item.consumo)|replace('.', ',') }}</div>
-                        {% endif %}
-                        {% if item.haver_anterior > 0 %}
-                            <div class="col-6 text-end">Haver ant.: + R$ {{ "%.2f"|format(item.haver_anterior)|replace('.', ',') }}</div>
-                        {% endif %}
-                    </div>
-
-                    <hr class="my-2">
-
-                    <div class="d-flex justify-content-between align-items-center small">
-                        <div>
-                            <span class="text-muted">Pago ({{ item.forma_pagamento }}):</span>
-                            <strong class="text-success fs-6">R$ {{ "%.2f"|format(item.valor_pago)|replace('.', ',') }}</strong>
+                <div class="card border-0 shadow-sm mb-2">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold fs-6">{{ item.data.strftime('%d/%m/%Y') }}</span>
+                            <span class="badge bg-dark">{{ item.qtd_entregas }} entrega(s)</span>
                         </div>
-                        {% if item.novo_haver > 0 %}
-                            <span class="badge bg-warning text-dark">Ficou Haver: R$ {{ "%.2f"|format(item.novo_haver)|replace('.', ',') }}</span>
-                        {% else %}
-                            <span class="badge bg-light text-muted border">Quitado</span>
-                        {% endif %}
+
+                        <div class="row g-1 small text-muted mb-2">
+                            <div class="col-6">Entregas: <strong class="text-dark">R$ {{ "%.2f"|format(item.valor_entregas)|replace('.', ',') }}</strong></div>
+                            <div class="col-6 text-end">Encostada: <strong class="text-dark">R$ {{ "%.2f"|format(item.encostada)|replace('.', ',') }}</strong></div>
+                            {% if item.extra and item.extra > 0 %}
+                                <div class="col-6 text-success">Extra: + R$ {{ "%.2f"|format(item.extra)|replace('.', ',') }}</div>
+                            {% endif %}
+                            {% if item.consumo > 0 %}
+                                <div class="col-6 text-danger">Consumo/Vale: - R$ {{ "%.2f"|format(item.consumo)|replace('.', ',') }}</div>
+                            {% endif %}
+                            {% if item.haver_anterior > 0 %}
+                                <div class="col-6 text-end">Haver ant.: + R$ {{ "%.2f"|format(item.haver_anterior)|replace('.', ',') }}</div>
+                            {% endif %}
+                        </div>
+
+                        <hr class="my-2">
+
+                        <div class="d-flex justify-content-between align-items-center small">
+                            <div>
+                                {% set total_pago_item = item.valor_pago + (item.valor_pago_2 or 0) %}
+                                <span class="text-muted">
+                                    Pago ({{ item.forma_pagamento }}{% if item.valor_pago_2 and item.valor_pago_2 > 0 %} + {{ item.forma_pagamento_2 }}{% endif %}):
+                                </span>
+                                <strong class="text-success fs-6">R$ {{ "%.2f"|format(total_pago_item)|replace('.', ',') }}</strong>
+                                {% if item.valor_pago_2 and item.valor_pago_2 > 0 %}
+                                    <div class="text-muted" style="font-size: 0.75rem;">
+                                        {{ item.forma_pagamento }}: R$ {{ "%.2f"|format(item.valor_pago)|replace('.', ',') }} |
+                                        {{ item.forma_pagamento_2 }}: R$ {{ "%.2f"|format(item.valor_pago_2)|replace('.', ',') }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            {% if item.novo_haver > 0 %}
+                                <span class="badge bg-warning text-dark">Ficou Haver: R$ {{ "%.2f"|format(item.novo_haver)|replace('.', ',') }}</span>
+                            {% else %}
+                                <span class="badge bg-light text-muted border">Quitado</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
-            </div>
             {% endfor %}
         {% endif %}
     </main>

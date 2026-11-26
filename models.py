@@ -74,12 +74,15 @@ class AcertoMotoboy(db.Model):
     motoboy_id = db.Column(db.Integer, db.ForeignKey('motoboys.id'), nullable=False)
 
     encostada = db.Column(db.Numeric(10, 2), default=0.00)
+    extra = db.Column(db.Numeric(10, 2), default=0.00)
     consumo = db.Column(db.Numeric(10, 2), default=0.00)
     haver_anterior = db.Column(db.Numeric(10, 2), default=0.00)
 
     total_a_pagar = db.Column(db.Numeric(10, 2), default=0.00)
     valor_pago = db.Column(db.Numeric(10, 2), default=0.00)
     forma_pagamento = db.Column(db.String(50), default='Pix')
+    valor_pago_2 = db.Column(db.Numeric(10, 2), default=0.00)
+    forma_pagamento_2 = db.Column(db.String(50), nullable=True)
     novo_haver = db.Column(db.Numeric(10, 2), default=0.00)
 
     itens_faixa = db.relationship('AcertoItemFaixa', backref='acerto', cascade='all, delete-orphan', lazy=True)
@@ -105,3 +108,15 @@ class RecebimentoDinheiro(db.Model):
     valor = db.Column(db.Numeric(10, 2), nullable=False)
 
     motoboy = db.relationship('Motoboy')
+
+class RascunhoRecebimentoDinheiro(db.Model):
+    __tablename__ = 'rascunhos_recebimentos_dinheiro'
+    id = db.Column(db.Integer, primary_key=True)
+    loja_id = db.Column(db.Integer, db.ForeignKey('lojas.id'), nullable=False)
+    data = db.Column(db.Date, nullable=False, default=date.today)
+    motoboy_id = db.Column(db.Integer, db.ForeignKey('motoboys.id'), nullable=False)
+    numero_pedido = db.Column(db.String(50), nullable=False)
+    valor = db.Column(db.Numeric(10, 2), nullable=False)
+
+    motoboy = db.relationship('Motoboy')
+

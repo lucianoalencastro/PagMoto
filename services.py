@@ -1,7 +1,7 @@
 from datetime import datetime, date
 from decimal import Decimal
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, FechamentoDiario, AcertoMotoboy, AcertoItemFaixa, RecebimentoDinheiro
+from models import db, FechamentoDiario, AcertoMotoboy, AcertoItemFaixa, RecebimentoDinheiro, RascunhoRecebimentoDinheiro
 from repositories import AuthRepository, FechamentoRepository, MotoboyRepository, ConfiguracaoRepository, HistoricoRepository
 from helpers import parse_decimal, parse_int
 from fpdf import FPDF
@@ -89,11 +89,14 @@ class FechamentoService:
                 qtds = {item.faixa_tarifa_id: item.quantidade for item in linha.itens_faixa}
                 acertos_existentes[linha.motoboy_id] = {
                     "encostada": float(linha.encostada),
+                    "extra": float(linha.extra or 0.00),
                     "consumo": float(linha.consumo),
                     "haver_anterior": float(linha.haver_anterior),
                     "total_a_pagar": float(linha.total_a_pagar),
                     "valor_pago": float(linha.valor_pago),
                     "forma_pagamento": linha.forma_pagamento,
+                    "valor_pago_2": float(linha.valor_pago_2 or 0.00),
+                    "forma_pagamento_2": linha.forma_pagamento_2 or "Dinheiro",
                     "novo_haver": float(linha.novo_haver),
                     "qtds": qtds
                 }
@@ -106,17 +109,26 @@ class FechamentoService:
                 haver_ant = self.repo.get_ultimo_haver_motoboy(mb.id, data_ref)
                 dados = {
                     "encostada": float(loja.valor_encostada_padrao or 0.00),
+                    "extra": 0.00,
                     "consumo": 0.00,
                     "haver_anterior": haver_ant,
                     "total_a_pagar": 0.00,
                     "valor_pago": 0.00,
                     "forma_pagamento": "Pix",
+                    "valor_pago_2": 0.00,
+                    "forma_pagamento_2": "Dinheiro",
                     "novo_haver": haver_ant,
                     "qtds": {}
                 }
             linhas_planilha.append({"motoboy": mb, **dados})
 
-        recebimentos = fechamento.recebimentos if fechamento else []
+        if fechamento:
+            recebimentos = fechamento.recebimentos
+        else:
+            recebimentos = RascunhoRecebimentoDinheiro.query.filter_by(
+                loja_id=loja_id, data=data_ref
+            ).order_by(RascunhoRecebimentoDinheiro.id.asc()).all()
+
         observacoes = fechamento.observacoes if fechamento else ""
 
         return {
@@ -129,6 +141,24 @@ class FechamentoService:
             "observacoes": observacoes,
             "ja_salvo": fechamento is not None
         }
+
+    def sincronizar_rascunho_dinheiro(self, loja_id: int, data_str: str, itens: list):
+        data_ref = datetime.strptime(data_str, "%Y-%m-%d").date()
+        RascunhoRecebimentoDinheiro.query.filter_by(loja_id=loja_id, data=data_ref).delete()
+
+        for item in itens:
+            mb_id = item.get("motoboy_id")
+            pedido = str(item.get("pedido", "")).strip()
+            val_dec = self._to_decimal(item.get("valor"))
+            if mb_id and (pedido or val_dec > 0):
+                db.session.add(RascunhoRecebimentoDinheiro(
+                    loja_id=loja_id,
+                    data=data_ref,
+                    motoboy_id=int(mb_id),
+                    numero_pedido=pedido,
+                    valor=val_dec
+                ))
+        db.session.commit()
 
     def salvar_fechamento(self, loja_id: int, form_data):
         data_str = form_data.get("data_fechamento")
@@ -160,9 +190,12 @@ class FechamentoService:
 
             haver_anterior = Decimal(str(self.repo.get_ultimo_haver_motoboy(mb.id, data_ref)))
 
+            extra = self._to_decimal(form_data.get(f"{prefix}extra"))
             consumo = self._to_decimal(form_data.get(f"{prefix}consumo"))
             valor_pago = self._to_decimal(form_data.get(f"{prefix}valor_pago"))
             forma_pagamento = form_data.get(f"{prefix}forma_pagamento", "Pix")
+            valor_pago_2 = self._to_decimal(form_data.get(f"{prefix}valor_pago_2"))
+            forma_pagamento_2 = form_data.get(f"{prefix}forma_pagamento_2") if valor_pago_2 > 0 else None
 
             total_entregas = Decimal("0.00")
             itens_faixa = []
@@ -179,18 +212,21 @@ class FechamentoService:
                     quantidade=qtd
                 ))
 
-            total_a_pagar = total_entregas + encostada + haver_anterior - consumo
-            novo_haver = total_a_pagar - valor_pago
+            total_a_pagar = total_entregas + encostada + extra + haver_anterior - consumo
+            novo_haver = total_a_pagar - (valor_pago + valor_pago_2)
 
             acerto = AcertoMotoboy(
                 fechamento_id=fechamento.id,
                 motoboy_id=mb.id,
                 encostada=encostada,
+                extra=extra,
                 consumo=consumo,
                 haver_anterior=haver_anterior,
                 total_a_pagar=total_a_pagar,
                 valor_pago=valor_pago,
                 forma_pagamento=forma_pagamento,
+                valor_pago_2=valor_pago_2,
+                forma_pagamento_2=forma_pagamento_2,
                 novo_haver=novo_haver,
                 itens_faixa=itens_faixa
             )
@@ -210,8 +246,10 @@ class FechamentoService:
                     valor=val_dec
                 ))
 
+        RascunhoRecebimentoDinheiro.query.filter_by(loja_id=loja_id, data=data_ref).delete()
         db.session.commit()
         return {"success": True, "data": data_str}
+
 
     def gerar_pdf_fechamento(self, loja_id: int, data_str: str = None) -> bytes:
         dados = self.montar_planilha_dia(loja_id, data_str)
@@ -541,19 +579,25 @@ class HistoricoService:
                 (Decimal(str(item.quantidade)) * Decimal(str(item.valor_unitario_snapshot)))
                 for item in ac.itens_faixa
             )
+            pago_1 = Decimal(str(ac.valor_pago or 0))
+            pago_2 = Decimal(str(ac.valor_pago_2 or 0))
+
             extrato.append({
                 "data": ac.fechamento.data,
                 "qtd_entregas": qtd_entregas,
                 "valor_entregas": valor_entregas,
                 "encostada": ac.encostada,
+                "extra": ac.extra or Decimal("0.00"),
                 "consumo": ac.consumo,
                 "haver_anterior": ac.haver_anterior,
                 "total_a_pagar": ac.total_a_pagar,
-                "valor_pago": ac.valor_pago,
+                "valor_pago": pago_1,
                 "forma_pagamento": ac.forma_pagamento,
+                "valor_pago_2": pago_2,
+                "forma_pagamento_2": ac.forma_pagamento_2 or "",
                 "novo_haver": ac.novo_haver
             })
-            total_pago += Decimal(str(ac.valor_pago or 0))
+            total_pago += pago_1 + pago_2
 
         saldo_haver_atual = Decimal(str(acertos[0].novo_haver or 0)) if acertos else Decimal("0.00")
 
@@ -564,8 +608,3 @@ class HistoricoService:
             "saldo_haver_atual": saldo_haver_atual,
             "total_pago_acumulado": total_pago
         }
-
-
-
-
-
